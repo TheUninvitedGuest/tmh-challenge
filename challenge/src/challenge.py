@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
-import pandas as pd
-from pandas import plotting
-import matplotlib.pyplot as plt
+
+import multiprocessing
 
 from hh_sim.hh_sim import HHSim
 from pv_sim.pv_sim import PVSim
 
-
-START_DATETIME = "2019-06-29 00:00:00"
-END_DATETIME = "2019-06-29 23:59:59"
-SAMPLING_ITVL = "60s"
+# Simulation time range and sampling intervals
+START_DATETIME = "2019.06.29 00:00:00"
+END_DATETIME = "2019.06.29 23:59:59"
+SAMPLING_ITVL = "600s"
 
 
 class Problem:
+    """ Here we start up our simulation workers. Both the household simulator (HH) and PV simulator (PV) are running in
+        seperated processes to demonstrate real-world applicability within a distributed environment."""
+
     hhsim: HHSim
     pvsim: PVSim
-    times: pd.DatetimeIndex
+    jobs: []
 
     def __init__(self):
-        self.hhsim = HHSim()
+        self.hhsim = HHSim(START_DATETIME, END_DATETIME, freq=SAMPLING_ITVL)
         self.pvsim = PVSim()
-        self.times = pd.date_range(START_DATETIME, END_DATETIME, freq=SAMPLING_ITVL)
+        self.jobs = []
 
     def run(self):
-        df = pd.DataFrame(index=self.times)
-        df['PV'] = self.pvsim.get_pac_kw(self.times)
-        df['HH'] = self.hhsim.get_pac_kw(self.times)
-        df['Sum'] = df['PV'] + df['HH']
-        print(df)
-        df.plot()
-        plt.show()
+        self.jobs.append(multiprocessing.Process(target=self.pvsim.run))
+        self.jobs.append(multiprocessing.Process(target=self.hhsim.run))
+        for job in self.jobs:
+            job.start()
+
 
 if __name__ == '__main__':
     problem = Problem()
